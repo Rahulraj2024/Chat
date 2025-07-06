@@ -1,0 +1,351 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal Chat</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #ece5dd;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #chat-container {
+      width: 95vw;
+      max-width: 500px;
+      height: 90vh;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .header {
+      background-color: #075e54;
+      color: white;
+      padding: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: white;
+    }
+    .header-info {
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+    }
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      background-color: #e5ddd5;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+    .message-wrapper {
+      display: flex;
+      justify-content: flex-start;
+      margin-bottom: 10px;
+    }
+    .sent-wrapper {
+      justify-content: flex-end;
+    }
+    .message {
+      max-width: 75%;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+      word-wrap: break-word;
+    }
+    .sent {
+      background: #dcf8c6;
+      border-bottom-right-radius: 0;
+      text-align: right;
+    }
+    .received {
+      background: white;
+      border-bottom-left-radius: 0;
+      text-align: left;
+    }
+    .timestamp {
+      font-size: 10px;
+      color: #555;
+      text-align: right;
+      margin-top: 5px;
+    }
+    .tick {
+      font-size: 10px;
+      margin-left: 4px;
+      color: #888;
+    }
+    .tick.read {
+      color: #4CAF50; /* Green tick when message is read */
+    }
+    #input-area {
+      display: flex;
+      padding: 10px;
+      background: #f0f0f0;
+      border-top: 1px solid #ddd;
+      align-items: center;
+    }
+    #message {
+      flex: 1;
+      padding: 10px;
+      border-radius: 20px;
+      border: 1px solid #ccc;
+    }
+    button, .icon-btn {
+      margin-left: 10px;
+      background: #128c7e;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+    .icon-btn {
+      padding: 8px;
+      border-radius: 50%;
+    }
+    #login-box {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+    #login-box input {
+      display: block;
+      margin: 10px auto;
+      width: 80%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    #attachment-menu {
+      display: none;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px;
+      background: #fff;
+      border-top: 1px solid #ccc;
+    }
+    .attach-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 12px;
+      width: 60px;
+      margin: 5px;
+    }
+    .attach-item button {
+      background: #eee;
+      border: none;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 18px;
+    }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
+    import { getDatabase, ref, push, onChildAdded, onValue, set, remove, get } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-database.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-auth.js";const firebaseConfig = {
+  apiKey: "AIzaSyD29aY5lJki4LSorXQI47Vb_4YMOgELOUk",
+  authDomain: "chatting-web-c745e.firebaseapp.com",
+  databaseURL: "https://chatting-web-c745e-default-rtdb.firebaseio.com",
+  projectId: "chatting-web-c745e",
+  storageBucket: "chatting-web-c745e.appspot.com",
+  messagingSenderId: "148717262806",
+  appId: "1:148717262806:web:565d8e7fc104d643503677"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+const loginBox = document.getElementById("login-box");
+const chatContainer = document.getElementById("chat-container");
+const messagesDiv = document.getElementById("messages");
+const messageInput = document.getElementById("message");
+const roomId = "anand_don";
+const roomRef = ref(db, "messages/" + roomId);
+let currentUser = null;
+let otherUser = null;
+
+document.getElementById("login-btn").onclick = () => {
+  const rawUsername = document.getElementById("username").value.trim().toLowerCase();
+  const password = document.getElementById("password").value;
+  const email = `${rawUsername}@chatapp.com`;
+
+  signInWithEmailAndPassword(auth, email, password)
+    .then(() => {
+      currentUser = rawUsername;
+      otherUser = currentUser === "anand" ? "don" : "anand";
+      loginBox.style.display = "none";
+      chatContainer.style.display = "flex";
+
+      document.getElementById("chat-header-name").textContent =
+        otherUser.charAt(0).toUpperCase() + otherUser.slice(1);
+
+      set(ref(db, `status/${currentUser}`), { online: true, lastSeen: Date.now() });
+      set(ref(db, `read/${roomId}/${currentUser}`), Date.now());
+      startChat();
+    })
+    .catch((error) => alert("Login failed: " + error.message));
+};
+
+window.addEventListener("beforeunload", () => {
+  if (currentUser) {
+    set(ref(db, `status/${currentUser}`), { online: false, lastSeen: Date.now() });
+  }
+});
+
+function startChat() {
+  const typingRef = ref(db, `typing/${roomId}/${currentUser}`);
+  const otherTypingRef = ref(db, `typing/${roomId}/${otherUser}`);
+  const otherStatusRef = ref(db, `status/${otherUser}`);
+  const statusEl = document.getElementById("chat-header-status");
+  const readRef = ref(db, `read/${roomId}/${otherUser}`);
+  const myReadRef = ref(db, `read/${roomId}/${currentUser}`);
+
+  onValue(myReadRef, () => {
+    set(myReadRef, Date.now());
+  });
+
+  let readTimestamp = 0;
+  onValue(readRef, (snap) => {
+    readTimestamp = snap.exists() ? snap.val() : 0;
+  });
+
+  onChildAdded(roomRef, (snapshot) => {
+    const msg = snapshot.val();
+    const wrapper = document.createElement("div");
+    const bubble = document.createElement("div");
+    const time = new Date(msg.timestamp).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    const isSent = msg.sender === currentUser;
+    const isRead = readTimestamp >= msg.timestamp;
+
+    wrapper.className = "message-wrapper" + (isSent ? " sent-wrapper" : "");
+    bubble.className = "message " + (isSent ? "sent" : "received");
+
+    const tick = isSent
+      ? `<span class='tick ${isRead ? "read" : ""}'>&#10003;</span>`
+      : "";
+
+    bubble.innerHTML = `${msg.text}<div class='timestamp'>${time} ${tick}</div>`;
+    wrapper.appendChild(bubble);
+    messagesDiv.appendChild(wrapper);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+
+  onValue(otherTypingRef, (snapshot) => {
+    if (snapshot.exists()) {
+      statusEl.textContent = "typing...";
+    } else {
+      get(otherStatusRef).then((snap) => {
+        if (snap.exists()) {
+          const data = snap.val();
+          if (data.online) {
+            statusEl.textContent = "online";
+          } else {
+            const lastSeen = new Date(data.lastSeen).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit"
+            });
+            statusEl.textContent = `last seen at ${lastSeen}`;
+          }
+        }
+      });
+    }
+  });
+
+  let typingTimeout;
+  messageInput.addEventListener("input", () => {
+    if (messageInput.value.trim()) {
+      set(typingRef, true);
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        remove(typingRef);
+      }, 1500);
+    } else {
+      remove(typingRef);
+      clearTimeout(typingTimeout);
+    }
+  });
+
+  document.getElementById("send-btn").onclick = () => {
+    const text = messageInput.value;
+    if (text.trim()) {
+      push(roomRef, {
+        sender: currentUser,
+        text: text,
+        timestamp: Date.now()
+      });
+      messageInput.value = "";
+      remove(typingRef);
+    }
+  };
+}
+
+document.getElementById("attach-toggle").onclick = () => {
+  const menu = document.getElementById("attachment-menu");
+  menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+};
+
+  </script>
+</head>
+<body>
+  <div id="login-box">
+    <h2>Login to Chat</h2>
+    <input type="text" id="username" placeholder="Enter your username" />
+    <input type="password" id="password" placeholder="Enter your password" />
+    <button id="login-btn">Login</button>
+  </div>
+  <div id="chat-container" style="display:none">
+    <div class="header">
+      <img src="https://cdn-icons-png.flaticon.com/512/1946/1946429.png" alt="User" />
+      <div class="header-info">
+        <span id="chat-header-name">User</span>
+        <small id="chat-header-status">loading...</small>
+      </div>
+    </div>
+    <div id="messages"></div>
+    <div id="attachment-menu">
+      <div class="attach-item">
+        <button onclick="alert('Open Gallery')">🖼️</button>
+        <span>Gallery</span>
+      </div>
+      <div class="attach-item">
+        <button onclick="alert('Open Camera')">📷</button>
+        <span>Camera</span>
+      </div>
+      <div class="attach-item">
+        <button onclick="alert('Share Location')">📍</button>
+        <span>Location</span>
+      </div>
+      <div class="attach-item">
+        <button onclick="alert('Upload Document')">📄</button>
+        <span>Document</span>
+      </div>
+    </div>
+    <div id="input-area">
+      <button class="icon-btn" id="attach-toggle">📎</button>
+      <input type="text" id="message" placeholder="Type a message..." />
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+</body>
+</html>
